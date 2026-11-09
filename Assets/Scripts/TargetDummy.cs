@@ -146,6 +146,7 @@ namespace FpsPractice.FPS
         private Color baseColor = Color.white;
         private float elapsedTime;
         private Vector3 moveDirection;
+        private Vector3 baseScale;
 
         private void Awake()
         {
@@ -168,6 +169,7 @@ namespace FpsPractice.FPS
         public void Initialize()
         {
             targetCamera = Camera.main;
+            baseScale = transform.localScale;
             elapsedTime = 0f;
             moveDirection = (Vector3.up + new Vector3(Random.Range(-sidewaysDrift, sidewaysDrift), 0f, 0f)).normalized;
             FaceCamera();
@@ -212,6 +214,10 @@ namespace FpsPractice.FPS
             }
 
             transform.rotation = Quaternion.LookRotation(toCamera, Vector3.up) * Quaternion.Euler(0f, 180f, 0f);
+            float depth = Vector3.Dot(transform.position - cameraToFace.transform.position, cameraToFace.transform.forward);
+            float scale = cameraToFace.orthographic ? cameraToFace.orthographicSize / 5f :
+                Mathf.Max(0.01f, depth) / 10f * Mathf.Tan(cameraToFace.fieldOfView * 0.5f * Mathf.Deg2Rad) / Mathf.Tan(30f * Mathf.Deg2Rad);
+            transform.localScale = baseScale * scale;
         }
     }
 }

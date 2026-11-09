@@ -13,6 +13,7 @@ namespace FpsPractice.FPS
         [Header("References")]
         [SerializeField] private Camera playerCamera;
         [SerializeField] private PlayerLook playerLook;
+        [SerializeField] private AimLabPlayerController aimLabPlayerController;
         [SerializeField] private AimLabModeManager aimLabModeManager;
         [SerializeField] private AimLabTargetSpawner targetSpawner;
 
@@ -24,6 +25,7 @@ namespace FpsPractice.FPS
         [SerializeField] private TMP_Text fieldOfViewValueText;
         [SerializeField] private Button closeButton;
         [SerializeField] private Button resetDefaultsButton;
+        [SerializeField] private Button quitButton;
 
         [Header("Limits")]
         [SerializeField] private float mouseSensitivityMin = 0.1f;
@@ -88,6 +90,11 @@ namespace FpsPractice.FPS
             if (playerLook == null)
             {
                 playerLook = GetComponentInChildren<PlayerLook>(true);
+            }
+
+            if (aimLabPlayerController == null)
+            {
+                aimLabPlayerController = FindFirstObjectByType<AimLabPlayerController>();
             }
 
             if (playerCamera == null)
@@ -185,8 +192,32 @@ namespace FpsPractice.FPS
                 resetDefaultsButton.onClick.RemoveListener(ResetSettingsToDefault);
                 resetDefaultsButton.onClick.AddListener(ResetSettingsToDefault);
             }
+            if (quitButton == null && pauseMenuRoot != null)
+            {
+                Transform quit = pauseMenuRoot.transform.Find("QuitGame");
+                if (quit != null) quitButton = quit.GetComponent<Button>();
+            }
+            if (quitButton == null)
+            {
+                quitButton = PlayerSetupHelper.CreateQuitButton(resetDefaultsButton);
+            }
+            if (quitButton != null)
+            {
+                quitButton.onClick.RemoveListener(QuitGame);
+                quitButton.onClick.AddListener(QuitGame);
+            }
 
             isWiring = false;
+        }
+
+        public void QuitGame()
+        {
+            PlayerPrefs.Save();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         private void LoadSettings()
@@ -313,6 +344,11 @@ namespace FpsPractice.FPS
             if (playerLook != null)
             {
                 playerLook.SetMouseSensitivity(clampedValue);
+            }
+
+            if (aimLabPlayerController != null)
+            {
+                aimLabPlayerController.SetMouseSensitivity(clampedValue);
             }
 
             if (mouseSensitivitySlider != null)

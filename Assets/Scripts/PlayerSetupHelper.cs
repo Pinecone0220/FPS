@@ -30,6 +30,7 @@ namespace FpsPractice.FPS
         [SerializeField] private Button closeButton;
         [SerializeField] private Button resetDefaultsButton;
         [SerializeField] private Button lobbyButton;
+        [SerializeField] private Button quitButton;
         [SerializeField] private float mouseSensitivityMin = 0.1f;
         [SerializeField] private float mouseSensitivityMax = 10f;
         [SerializeField] private float fieldOfViewMin = 40f;
@@ -163,6 +164,20 @@ namespace FpsPractice.FPS
                 lobbyButton.onClick.RemoveListener(LoadLobbyScene);
                 lobbyButton.onClick.AddListener(LoadLobbyScene);
             }
+            if (quitButton == null && pauseMenuRoot != null)
+            {
+                Transform quit = pauseMenuRoot.transform.Find("QuitGame");
+                if (quit != null) quitButton = quit.GetComponent<Button>();
+            }
+            if (quitButton == null)
+            {
+                quitButton = CreateQuitButton(resetDefaultsButton);
+            }
+            if (quitButton != null)
+            {
+                quitButton.onClick.RemoveListener(QuitGame);
+                quitButton.onClick.AddListener(QuitGame);
+            }
             UpdateCrouchKeyLabel();
             isWiring = false;
         }
@@ -243,6 +258,38 @@ namespace FpsPractice.FPS
             ApplySensitivity(defaultMouseSensitivity, true);
             ApplyFieldOfView(defaultFieldOfView, true);
             ApplyCrouchKey(defaultCrouchKey, true);
+        }
+
+        public static Button CreateQuitButton(Button template)
+        {
+            if (template == null)
+            {
+                return null;
+            }
+
+            Button button = Instantiate(template, template.transform.parent);
+            button.name = "QuitGame";
+            button.onClick = new Button.ButtonClickedEvent();
+            RectTransform rect = button.transform as RectTransform;
+            if (rect != null)
+            {
+                rect.anchoredPosition = new Vector2(0f, -455f);
+            }
+            TMP_Text tmpLabel = button.GetComponentInChildren<TMP_Text>(true);
+            if (tmpLabel != null) tmpLabel.text = "Quit Game";
+            Text label = button.GetComponentInChildren<Text>(true);
+            if (label != null) label.text = "Quit Game";
+            return button;
+        }
+
+        public void QuitGame()
+        {
+            PlayerPrefs.Save();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         public void LoadLobbyScene()

@@ -190,6 +190,12 @@ private int magazineSize;
 	[SerializeField]
 	private float aimTransitionSpeed;
 
+	[Tooltip("정조준 시 조준기를 화면 중앙에 맞추기 위한 무기별 위치 보정입니다.")]
+	[SerializeField] private Vector3 aimPositionOffset;
+
+	[Tooltip("정조준 시 가늠자와 가늠쇠의 시선을 맞추는 무기별 회전 보정입니다.")]
+	[SerializeField] private Vector3 aimRotationOffsetEuler;
+
 	[Tooltip("Hip-fire bullet spread in degrees. Set this to 0 for perfectly accurate hip-fire.")]
 	[SerializeField]
 	private float hipSpreadAngle;
@@ -255,6 +261,11 @@ private int magazineSize;
 	[SerializeField]
 	private Transform firePoint;
 
+	[Tooltip("총구 위치가 따라갈 무기 애니메이션 본입니다.")]
+	[SerializeField] private Transform muzzleAnchorBone;
+	[Tooltip("무기 본 기준 총구 위치입니다.")]
+	[SerializeField] private Vector3 muzzleAnchorOffset;
+
 	[Tooltip("\ufffd\ufffd\ufffd\ufffd \ufffd÷\ufffd\ufffdð\ufffd \ufffd\u07fb\ufffd\ufffdϴ\ufffd \ufffd\ufffdġ\ufffdԴϴ\ufffd. \ufffd\ufffd\ufffd \ufffd\ufffd\ufffd\ufffd\ufffd\ufffd ź \ufffd\ufffd\ufffd\ufffd \ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\u0333\ufffd \ufffd\ufffd \ufffd\ufffdġ\ufffd\ufffd \ufffd\ufffd\ufffd\ufffdմϴ\ufffd.")]
 	[SerializeField]
 	private Transform muzzleFlashSpawnPoint;
@@ -279,6 +290,9 @@ private int magazineSize;
 	[Tooltip("Sound played when the weapon draw animation starts.")]
 	[SerializeField]
 	private AudioClip equipClip;
+
+	[Tooltip("장착 애니메이션 이벤트가 없는 무기만 장착 시 소리를 재생합니다.")]
+	[SerializeField] private bool playEquipSoundWithoutAnimationEvent;
 
 	[Tooltip("Sound played when the aim-in animation starts.")]
 	[SerializeField]
@@ -329,6 +343,8 @@ private int magazineSize;
 	private float equipReadyTime;
 
 	private Vector3 baseLocalPosition;
+
+	private float aimAlignmentWeight;
 
 	private Quaternion baseLocalRotation;
 
@@ -489,6 +505,18 @@ private void Awake()
 		}
 		playerLook = ((Component)this).GetComponentInParent<PlayerLook>();
 		playerController = ((Component)this).GetComponentInParent<PlayerController>();
+		if (weaponCamera == null)
+		{
+			weaponCamera = GetComponentInParent<Camera>();
+			if (weaponCamera == null && playerLook != null)
+			{
+				weaponCamera = playerLook.GetComponentInChildren<Camera>();
+			}
+		}
+		if (audioSource == null)
+		{
+			audioSource = GetComponent<AudioSource>();
+		}
 		if ((Object)(object)weaponAnimator == (Object)null)
 		{
 			weaponAnimator = ((Component)this).GetComponentInChildren<Animator>(true);
@@ -513,6 +541,7 @@ sprintAnimatorParameterHash = Animator.StringToHash(SprintAnimatorParameterName)
 		//IL_0018: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0029: Unknown result type (might be due to invalid IL or missing references)
 		((Component)this).transform.localPosition = baseLocalPosition;
+		aimAlignmentWeight = 0f;
 		((Component)this).transform.localRotation = baseLocalRotation;
 		((Component)this).transform.localScale = baseLocalScale;
 		if ((Object)(object)weaponAnimator != (Object)null)
@@ -588,6 +617,14 @@ sprintAnimatorParameterHash = Animator.StringToHash(SprintAnimatorParameterName)
 
 	private void LateUpdate()
 	{
+		if (aimPositionOffset != Vector3.zero || aimRotationOffsetEuler != Vector3.zero)
+		{
+			aimAlignmentWeight = Mathf.MoveTowards(aimAlignmentWeight,
+				isAiming && !IsReloading ? 1f : 0f, Mathf.Max(0.01f, aimTransitionSpeed) * Time.deltaTime);
+			transform.localPosition = baseLocalPosition + aimPositionOffset * aimAlignmentWeight;
+			transform.localRotation = Quaternion.Slerp(baseLocalRotation,
+				baseLocalRotation * Quaternion.Euler(aimRotationOffsetEuler), aimAlignmentWeight);
+		}
 		SyncViewModelCamera();
 	}
 
@@ -734,7 +771,11 @@ sprintAnimatorParameterHash = Animator.StringToHash(SprintAnimatorParameterName)
 	{
 		//IL_0028: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0009: Unknown result type (might be due to invalid IL or missing references)
-		if (aimToggle)
+		if (IsReloading)
+		{
+			isAiming = false;
+		}
+		else if (aimToggle)
 		{
 			if (Input.GetKeyDown(aimKey))
 			{
@@ -1038,6 +1079,10 @@ private void SetAimAnimation(bool aiming)
 			return;
 		}
 		Transform val = EnsureFirePoint();
+		if (muzzleAnchorBone != null && val != null && weaponCamera != null)
+		{
+			val.rotation = Quaternion.LookRotation(forward, weaponCamera.transform.up);
+		}
 		Vector3 val2 = (((Object)(object)val != (Object)null) ? val.position : position);
 		Quaternion val3 = (((Object)(object)val != (Object)null) ? val.rotation : Quaternion.LookRotation(forward, ((Component)weaponCamera).transform.up));
 		Quaternion val4 = Quaternion.Euler(muzzleFlashRotationOffsetEuler);
@@ -1176,6 +1221,16 @@ private IEnumerator Reload()
     }
 
     IsReloading = true;
+    isAiming = false;
+    SetAimAnimation(false);
+    if (playerController != null)
+    {
+        playerController.SetWeaponAiming(false);
+    }
+    if (crosshairObject != null)
+    {
+        crosshairObject.SetActive(crosshairDefaultActive);
+    }
     SetReloadingAnimation(reloading: true);
     if (IsIndividualShellReload())
     {
@@ -1240,6 +1295,10 @@ public void BeginEquip()
 		IsEquipped = true;
 		IsReloading = false;
 		equipReadyTime = Time.time + Mathf.Max(0f, equipTime);
+		if (playEquipSoundWithoutAnimationEvent)
+		{
+			PlayEquipSound();
+		}
 	}
 
 	private Vector3 GetShotDirection()
@@ -1289,6 +1348,26 @@ public void BeginEquip()
 		//IL_00a3: Unknown result type (might be due to invalid IL or missing references)
 		if ((Object)(object)firePoint != (Object)null)
 		{
+			return firePoint;
+		}
+		if (muzzleAnchorBone != null)
+		{
+			Transform existing = muzzleAnchorBone.Find("FirePoint");
+			if (existing != null)
+			{
+				firePoint = existing;
+				return firePoint;
+			}
+			GameObject point = new GameObject("FirePoint");
+			point.transform.SetParent(muzzleAnchorBone, false);
+			point.transform.localPosition = muzzleAnchorOffset;
+			Vector3 boneScale = muzzleAnchorBone.lossyScale;
+			Vector3 weaponScale = transform.lossyScale;
+			point.transform.localScale = new Vector3(
+				Mathf.Abs(boneScale.x) > 0.00001f ? weaponScale.x / boneScale.x : 1f,
+				Mathf.Abs(boneScale.y) > 0.00001f ? weaponScale.y / boneScale.y : 1f,
+				Mathf.Abs(boneScale.z) > 0.00001f ? weaponScale.z / boneScale.z : 1f);
+			firePoint = point.transform;
 			return firePoint;
 		}
 		Transform val = (((Object)(object)muzzleFlashSpawnPoint != (Object)null) ? muzzleFlashSpawnPoint : tracerSpawnPoint);

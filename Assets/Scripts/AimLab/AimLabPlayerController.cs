@@ -5,6 +5,10 @@ namespace FpsPractice.FPS
     [RequireComponent(typeof(CharacterController))]
     public class AimLabPlayerController : MonoBehaviour
     {
+        private const string MouseSensitivityKey = "Settings.MouseSensitivity";
+        private const string FieldOfViewKey = "Settings.FieldOfView";
+        private const string CrouchKeySettingKey = "Settings.CrouchKey";
+
         [Header("Look")]
         [SerializeField] private Transform playerBody;
         [SerializeField] private Camera playerCamera;
@@ -61,6 +65,14 @@ namespace FpsPractice.FPS
             if (settingsHelper == null)
             {
                 settingsHelper = GetComponentInChildren<AimLabSettingsHelper>(true);
+            }
+
+            mouseSensitivity = Mathf.Max(0f, PlayerPrefs.GetFloat(MouseSensitivityKey, mouseSensitivity));
+            crouchKey = LoadSharedCrouchKey();
+
+            if (playerCamera != null)
+            {
+                playerCamera.fieldOfView = PlayerPrefs.GetFloat(FieldOfViewKey, playerCamera.fieldOfView);
             }
         }
 
@@ -232,9 +244,20 @@ namespace FpsPractice.FPS
             crouchKey = keyCode;
         }
 
+        public void SetMouseSensitivity(float value)
+        {
+            mouseSensitivity = Mathf.Max(0f, value);
+        }
+
         public KeyCode GetCrouchKey()
         {
             return crouchKey;
+        }
+
+        private KeyCode LoadSharedCrouchKey()
+        {
+            int storedKey = PlayerPrefs.GetInt(CrouchKeySettingKey, (int)crouchKey);
+            return storedKey == (int)KeyCode.C ? KeyCode.C : KeyCode.LeftControl;
         }
 
         public void BeginSession()

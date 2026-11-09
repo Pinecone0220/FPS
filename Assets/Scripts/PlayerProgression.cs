@@ -116,9 +116,12 @@ namespace FpsPractice.FPS
         private readonly float[] currentRewardValues = new float[3];
         private readonly float[] pendingDamagePercent = new float[2];
         private readonly float[] pendingFireRatePercent = new float[2];
-        private readonly float[] pendingMagazineCapacityPercent = new float[2];
         private readonly int[] pendingAmmo = new int[2];
-        private readonly bool[] pendingInfiniteReserveAmmo = new bool[2];
+        private readonly bool[] infiniteAmmoRewards = new bool[2];
+        private readonly HashSet<Weapon>[] infiniteAmmoAppliedWeapons =
+        {
+            new HashSet<Weapon>(), new HashSet<Weapon>()
+        };
 
         public LevelUpReward SelectedReward { get; private set; }
         public float SelectedRewardValue { get; private set; }
@@ -347,11 +350,23 @@ namespace FpsPractice.FPS
 
             for (int i = 0; i < source.Count; i++)
             {
-                if (source[i] != null && !removedLegendaryRewards.Contains(source[i]))
+                if (source[i] != null && !removedLegendaryRewards.Contains(source[i]) &&
+                    !IsInfiniteAmmoRewardAlreadySelected(source[i]))
                 {
                     target.Add(source[i]);
                 }
             }
+        }
+
+        private bool IsInfiniteAmmoRewardAlreadySelected(LevelUpReward reward)
+        {
+            if (ResolveEffectType(reward) != RewardEffectType.InfiniteAmmo)
+            {
+                return false;
+            }
+
+            int slotIndex = GetRewardSlotIndex(reward.category);
+            return slotIndex >= 0 && infiniteAmmoRewards[slotIndex];
         }
 
         private IEnumerator EnableRewardSelectionAfterDelay()
@@ -463,8 +478,9 @@ namespace FpsPractice.FPS
                 case RewardEffectType.MaxHealthUp:
                     if (playerHealth != null)
                     {
+                        float previousMaxHealth = playerHealth.MaxHealth;
                         playerHealth.SetMaxHealth(playerHealth.MaxHealth + value, false);
-                        playerHealth.Heal(value);
+                        playerHealth.Heal(playerHealth.MaxHealth - previousMaxHealth);
                     }
                     break;
                 case RewardEffectType.AmmoUp:
@@ -544,17 +560,8 @@ namespace FpsPractice.FPS
                 return;
             }
 
-            Weapon weapon = GetRewardWeapon(category);
-            if (weapon != null)
-            {
-                weapon.AddMagazineCapacityPercent(-10f);
-                weapon.SetInfiniteReserveAmmo(true);
-            }
-            else
-            {
-                pendingMagazineCapacityPercent[slotIndex] -= 10f;
-                pendingInfiniteReserveAmmo[slotIndex] = true;
-            }
+            infiniteAmmoRewards[slotIndex] = true;
+            ApplyPendingWeaponRewards();
         }
 
         private void ApplyPendingWeaponRewards()
@@ -584,16 +591,10 @@ namespace FpsPractice.FPS
                     pendingFireRatePercent[slotIndex] = 0f;
                 }
 
-                if (!Mathf.Approximately(pendingMagazineCapacityPercent[slotIndex], 0f))
+                if (infiniteAmmoRewards[slotIndex] && infiniteAmmoAppliedWeapons[slotIndex].Add(weapon))
                 {
-                    weapon.AddMagazineCapacityPercent(pendingMagazineCapacityPercent[slotIndex]);
-                    pendingMagazineCapacityPercent[slotIndex] = 0f;
-                }
-
-                if (pendingInfiniteReserveAmmo[slotIndex])
-                {
+                    weapon.AddMagazineCapacityPercent(-10f);
                     weapon.SetInfiniteReserveAmmo(true);
-                    pendingInfiniteReserveAmmo[slotIndex] = false;
                 }
 
                 if (pendingAmmo[slotIndex] > 0)

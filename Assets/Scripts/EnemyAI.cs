@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Serialization;
@@ -32,6 +33,12 @@ namespace FpsPractice.FPS
         [SerializeField] private string attackTriggerParameter = "Attack";
         [Tooltip("사망 애니메이션이 끝날 때까지 좀비를 유지할 시간입니다. Death 클립 길이에 맞춥니다.")]
         [SerializeField, Min(0f)] private float deathAnimationDuration = 1.2f;
+
+        [Header("Lobby Training Dummy")]
+        [Tooltip("로비 더미가 제자리에서 반복 재생할 대기 애니메이션입니다.")]
+        [SerializeField] private AnimationClip lobbyIdleAnimation;
+        [Tooltip("로비 더미가 맞았을 때 재생할 피격 애니메이션입니다.")]
+        [SerializeField] private AnimationClip lobbyHitAnimation;
 
         [Header("Detection")]
         [SerializeField, Min(0f)] private float detectionRadius = 15f;
@@ -74,12 +81,19 @@ namespace FpsPractice.FPS
         private int deathTriggerHash;
         private float nextIdleSoundTime;
         private bool idleAudioDisabledInLobby;
+        private bool isLobbyDummy;
+        private Coroutine lobbyHitRoutine;
+        private bool restoreAgentAfterDeath;
+        private Collider[] deathColliders;
+        private bool[] colliderEnabledBeforeDeath;
 
         private void Awake()
         {
             selfHealth = GetComponent<Health>();
             characterController = GetComponent<CharacterController>();
             navMeshAgent = GetComponent<NavMeshAgent>();
+            deathColliders = GetComponentsInChildren<Collider>(true);
+            colliderEnabledBeforeDeath = new bool[deathColliders.Length];
 
             if (animator == null)
             {
@@ -91,11 +105,24 @@ namespace FpsPractice.FPS
             if (selfHealth != null)
             {
                 selfHealth.SetDeathAnimationDuration(deathAnimationDuration);
+                selfHealth.SetDeathAnimator(animator);
             }
             FindTarget();
             EnsureAgentOnNavMesh();
             ConfigureIdleAudio();
             idleAudioDisabledInLobby = SceneManager.GetActiveScene().name == "Lobby";
+            isLobbyDummy = idleAudioDisabledInLobby;
+            if (isLobbyDummy)
+            {
+                selfHealth.SetTrainingDummy();
+                selfHealth.Damaged += HandleLobbyDamage;
+                StopAgent();
+                if (navMeshAgent != null && navMeshAgent.enabled)
+                {
+                    navMeshAgent.enabled = false;
+                }
+                SetupLobbyAnimations();
+            }
             if (idleAudioDisabledInLobby && idleAudioSource != null)
             {
                 idleAudioSource.Stop();
@@ -113,6 +140,7 @@ namespace FpsPractice.FPS
             if (selfHealth != null)
             {
                 selfHealth.Died -= HandleDied;
+                selfHealth.Damaged -= HandleLobbyDamage;
             }
 
             CancelInvoke(nameof(PerformAttack));
@@ -120,6 +148,10 @@ namespace FpsPractice.FPS
 
         private void Update()
         {
+            if (isLobbyDummy)
+            {
+                return;
+            }
             if (selfHealth == null)
             {
                 return;
@@ -130,10 +162,35 @@ namespace FpsPractice.FPS
                 isDead = false;
                 hasAlerted = false;
                 nextAttackTime = 0f;
+                for (int i = 0; i < deathColliders.Length; i++)
+                {
+                    if (deathColliders[i] != null)
+                    {
+                        deathColliders[i].enabled = colliderEnabledBeforeDeath[i];
+                    }
+                }
+                if (restoreAgentAfterDeath && navMeshAgent != null)
+                {
+                    navMeshAgent.enabled = true;
+                    restoreAgentAfterDeath = false;
+                    EnsureAgentOnNavMesh();
+                }
+                if (animator != null)
+                {
+                    animator.Rebind();
+                    animator.Update(0f);
+                }
             }
 
             if (isDead || selfHealth.IsDead)
             {
+                return;
+            }
+
+            if (animator != null && animator.GetCurrentAnimatorStateInfo(0).IsName("Attack"))
+            {
+                StopAgent();
+                SetMovementAnimation(false, false);
                 return;
             }
 
@@ -196,12 +253,56 @@ namespace FpsPractice.FPS
 
         public void HearGunshot(Vector3 noisePosition)
         {
-            if (isDead || selfHealth == null || selfHealth.IsDead)
+            if (isLobbyDummy || isDead || selfHealth == null || selfHealth.IsDead)
             {
                 return;
             }
 
             hasAlerted = true;
+        }
+
+        private void SetupLobbyAnimations()
+        {
+            if (animator == null || animator.runtimeAnimatorController == null)
+            {
+                return;
+            }
+
+            AnimatorOverrideController overrides = new AnimatorOverrideController(animator.runtimeAnimatorController);
+            var clips = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<AnimationClip, AnimationClip>>();
+            overrides.GetOverrides(clips);
+            for (int i = 0; i < clips.Count; i++)
+            {
+                AnimationClip original = clips[i].Key;
+                if (original == null) continue;
+                AnimationClip replacement = original.name == "Walk" ? lobbyIdleAnimation :
+                    original.name == "Attack" ? lobbyHitAnimation : null;
+                if (replacement != null)
+                {
+                    clips[i] = new System.Collections.Generic.KeyValuePair<AnimationClip, AnimationClip>(original, replacement);
+                }
+            }
+            overrides.ApplyOverrides(clips);
+            animator.runtimeAnimatorController = overrides;
+            animator.Play("Walk", 0, 0f);
+            animator.speed = lobbyIdleAnimation != null ? 1f : 0f;
+        }
+
+        private void HandleLobbyDamage(float amount, Vector3 point, Vector3 normal)
+        {
+            if (animator == null || lobbyHitAnimation == null) return;
+            if (lobbyHitRoutine != null) StopCoroutine(lobbyHitRoutine);
+            lobbyHitRoutine = StartCoroutine(PlayLobbyHit());
+        }
+
+        private IEnumerator PlayLobbyHit()
+        {
+            animator.speed = 1f;
+            animator.Play("Attack", 0, 0f);
+            yield return new WaitForSeconds(lobbyHitAnimation.length);
+            animator.Play("Walk", 0, 0f);
+            animator.speed = lobbyIdleAnimation != null ? 1f : 0f;
+            lobbyHitRoutine = null;
         }
         private void FindTarget()
         {
@@ -311,6 +412,7 @@ namespace FpsPractice.FPS
             }
 
             navMeshAgent.isStopped = true;
+            navMeshAgent.velocity = Vector3.zero;
             navMeshAgent.updateRotation = false;
             navMeshAgent.ResetPath();
         }
@@ -525,12 +627,34 @@ namespace FpsPractice.FPS
         {
             isDead = true;
             CancelInvoke(nameof(PerformAttack));
+            for (int i = 0; i < deathColliders.Length; i++)
+            {
+                if (deathColliders[i] != null)
+                {
+                    colliderEnabledBeforeDeath[i] = deathColliders[i].enabled;
+                    deathColliders[i].enabled = false;
+                }
+            }
             StopAgent();
-            if (animator != null && HasAnimatorParameter(deathTriggerHash, AnimatorControllerParameterType.Trigger))
+            if (navMeshAgent != null && navMeshAgent.enabled)
+            {
+                if (navMeshAgent.isOnNavMesh)
+                {
+                    navMeshAgent.velocity = Vector3.zero;
+                }
+                restoreAgentAfterDeath = true;
+                navMeshAgent.enabled = false;
+            }
+            SetMovementAnimation(false, false);
+            if (animator != null && animator.HasState(0, deathTriggerHash))
+            {
+                animator.ResetTrigger(attackTriggerHash);
+                animator.Play(deathTriggerHash, 0, 0f);
+            }
+            else if (animator != null && HasAnimatorParameter(deathTriggerHash, AnimatorControllerParameterType.Trigger))
             {
                 animator.SetTrigger(deathTriggerHash);
             }
-            SetMovementAnimation(false, false);
 
         }
 

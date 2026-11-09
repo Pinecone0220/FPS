@@ -17,6 +17,7 @@ namespace FpsPractice.FPS
         public float CurrentHealth { get; private set; }
         public float MaxHealth => maxHealth;
         public float Armor => armor;
+        public const float MaxPlayerStat = 100f;
         public bool IsDead { get; private set; }
         public event Action<float, Vector3, Vector3> Damaged;
         public event Action Died;
@@ -29,9 +30,28 @@ namespace FpsPractice.FPS
         private Collider[] cachedColliders;
         private Rigidbody[] cachedRigidbodies;
         private Coroutine respawnRoutine;
+        private Animator deathAnimator;
+        private bool isTrainingDummy;
+        private bool isPlayer;
+
+        public void SetTrainingDummy()
+        {
+            isTrainingDummy = true;
+        }
+
+        public void SetDeathAnimator(Animator value)
+        {
+            deathAnimator = value;
+        }
 
         private void Awake()
         {
+            isPlayer = GetComponent<PlayerController>() != null || GetComponent<AimLabPlayerController>() != null;
+            if (isPlayer)
+            {
+                maxHealth = Mathf.Clamp(maxHealth, 1f, MaxPlayerStat);
+                armor = Mathf.Clamp(armor, 0f, MaxPlayerStat);
+            }
             spawnPosition = transform.position;
             spawnRotation = transform.rotation;
             spawnScale = transform.localScale;
@@ -46,6 +66,12 @@ namespace FpsPractice.FPS
         {
             if (IsDead || amount <= 0f)
             {
+                return;
+            }
+
+            if (isTrainingDummy)
+            {
+                Damaged?.Invoke(amount, hitPoint, hitNormal);
                 return;
             }
 
@@ -82,7 +108,7 @@ namespace FpsPractice.FPS
                 return;
             }
 
-            armor += amount;
+            armor = isPlayer ? Mathf.Min(MaxPlayerStat, armor + amount) : armor + amount;
         }
 
         public void ConfigureDeathBehavior(bool shouldDestroyOnDeath, bool shouldRespawnOnDeath, float newRespawnDelay)
@@ -99,7 +125,8 @@ namespace FpsPractice.FPS
 
         public void SetMaxHealth(float value, bool refillHealth = true)
         {
-            maxHealth = Mathf.Max(1f, value);
+            maxHealth = isPlayer ? Mathf.Clamp(value, 1f, MaxPlayerStat) : Mathf.Max(1f, value);
+            CurrentHealth = Mathf.Min(CurrentHealth, maxHealth);
 
             if (refillHealth)
             {
@@ -130,7 +157,7 @@ namespace FpsPractice.FPS
                 respawnRoutine = null;
             }
 
-            if (deathAnimationDuration > 0f)
+            if (deathAnimator != null || deathAnimationDuration > 0f)
             {
                 respawnRoutine = StartCoroutine(DeathAnimationCoroutine());
                 return;
@@ -141,7 +168,24 @@ namespace FpsPractice.FPS
 
         private IEnumerator DeathAnimationCoroutine()
         {
-            yield return new WaitForSeconds(deathAnimationDuration);
+            if (deathAnimator != null && deathAnimator.isActiveAndEnabled && deathAnimator.HasState(0, Animator.StringToHash("Death")))
+            {
+                yield return null;
+                while (deathAnimator != null && deathAnimator.isActiveAndEnabled &&
+                       deathAnimator.GetCurrentAnimatorStateInfo(0).IsName("Death") &&
+                       deathAnimator.GetCurrentAnimatorStateInfo(0).normalizedTime < 1f)
+                {
+                    yield return null;
+                }
+            }
+            else if (deathAnimationDuration > 0f)
+            {
+                yield return new WaitForSeconds(deathAnimationDuration);
+            }
+            if (deathAnimator != null)
+            {
+                yield return new WaitForSeconds(1f);
+            }
             FinishDeath();
         }
 

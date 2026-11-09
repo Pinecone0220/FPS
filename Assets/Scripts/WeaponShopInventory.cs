@@ -328,7 +328,7 @@ namespace FpsPractice.FPS
                 case InstantEffectType.Heal:
                     return playerHealth != null && playerHealth.CurrentHealth < playerHealth.MaxHealth;
                 case InstantEffectType.Armor:
-                    return playerHealth != null;
+                    return playerHealth != null && playerHealth.Armor < Health.MaxPlayerStat;
                 case InstantEffectType.Ammo:
                     Weapon currentWeapon = weaponLoadout != null ? weaponLoadout.CurrentWeapon as Weapon : null;
                     return currentWeapon != null && currentWeapon.CanAddAmmo(Mathf.RoundToInt(item.effectAmount));

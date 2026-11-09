@@ -802,6 +802,7 @@ GameObject:
   - component: {fileID: 57078354}
   - component: {fileID: 57078353}
   - component: {fileID: 57078352}
+  - component: {fileID: 7770100000000000001}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -872,6 +873,23 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!114 &7770100000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 57078351}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c409dd9bd70a4ce6943f1b45a0189a60, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::FpsPractice.FPS.PixelCombatUI
+  panelColor: {r: 0.075, g: 0.095, b: 0.075, a: 0.96}
+  buttonColor: {r: 0.27, g: 0.3, b: 0.23, a: 1}
+  highlightColor: {r: 0.55, g: 0.48, b: 0.28, a: 1}
+  textColor: {r: 0.91, g: 0.9, b: 0.8, a: 1}
+  borderColor: {r: 0.77, g: 0.61, b: 0.31, a: 1}
 --- !u!224 &57078355
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2979,6 +2997,8 @@ MonoBehaviour:
   runningParameter: IsRunning
   attackTriggerParameter: Attack
   deathAnimationDuration: 1.2
+  lobbyIdleAnimation: {fileID: 0}
+  lobbyHitAnimation: {fileID: 0}
   detectionRadius: 15
   detectionAngle: 90
   attackRange: 2.2
@@ -9959,6 +9979,8 @@ MonoBehaviour:
   runningParameter: IsRunning
   attackTriggerParameter: Attack
   deathAnimationDuration: 1.2
+  lobbyIdleAnimation: {fileID: 0}
+  lobbyHitAnimation: {fileID: 0}
   detectionRadius: 15
   detectionAngle: 90
   attackRange: 2.2
@@ -16815,6 +16837,10 @@ PrefabInstance:
       propertyPath: slots.Array.data[2].weapon
       value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 721489324352531494, guid: d46d3973e45ab614e89bb990704a8e9d, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 765529205607050155, guid: d46d3973e45ab614e89bb990704a8e9d, type: 3}
       propertyPath: moneyText
       value: 
@@ -16883,6 +16909,10 @@ PrefabInstance:
       propertyPath: aimLabModeButton
       value: 
       objectReference: {fileID: 1681862639}
+    - target: {fileID: 1489355488792239668, guid: d46d3973e45ab614e89bb990704a8e9d, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2611881793881644441, guid: d46d3973e45ab614e89bb990704a8e9d, type: 3}
       propertyPath: crosshairObject
       value: 
@@ -16990,6 +17020,10 @@ PrefabInstance:
     - target: {fileID: 6959596755715016227, guid: d46d3973e45ab614e89bb990704a8e9d, type: 3}
       propertyPath: m_Name
       value: Player
+      objectReference: {fileID: 0}
+    - target: {fileID: 8527929120477229787, guid: d46d3973e45ab614e89bb990704a8e9d, type: 3}
+      propertyPath: weaponType
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:
